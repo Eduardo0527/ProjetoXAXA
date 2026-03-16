@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Uploader</title>
+    <style>
+        body { 
+            font-family: sans-serif; 
+            padding: 40px; 
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* Styling for the drag-and-drop area */
+        #drop-zone {
+            width: 100%;
+            max-width: 500px;
+            height: 250px;
+            border: 3px dashed #cccccc;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            font-size: 1.2rem;
+            color: #888888;
+            background-color: #fafafa;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        /* Visual feedback when a file is dragged over the zone */
+        #drop-zone.dragover {
+            background-color: #e9f5ff;
+            border-color: #007bff;
+            color: #007bff;
+        }
+
+        #status { 
+            margin-top: 20px; 
+            font-weight: bold; 
+        }
+    </style>
+</head>
+<body>
+
+    <h2>Upload Audio</h2>
+    
+    <div id="drop-zone">
+        Drag & drop your audio file here
+    </div>
+    
+    <div id="status"></div>
+
+    <script>
+        const dropZone = document.getElementById('drop-zone');
+        const statusDiv = document.getElementById('status');
+
+        // 1. Prevent default browser behavior for drag-and-drop events
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+            document.body.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        // 2. Add visual styling when a file is hovered over the drop zone
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => {
+                dropZone.classList.add('dragover');
+            }, false);
+        });
+
+        // Remove styling when the file leaves the zone or is dropped
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => {
+                dropZone.classList.remove('dragover');
+            }, false);
+        });
+
+        // 3. Handle the actual drop event
+        dropZone.addEventListener('drop', handleDrop, false);
+
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+
+            if (files.length > 0) {
+                uploadFile(files[0]);
+            }
+        }
+
+        // 4. Send the file to your Flask backend
+        function uploadFile(file) {
+            // Optional but recommended: Validate it's an audio file
+            if (!file.type.startsWith('audio/')) {
+                statusDiv.style.color = 'red';
+                statusDiv.innerText = 'Error: Please upload a valid audio file.';
+                return;
+            }
+
+            statusDiv.style.color = '#333';
+            statusDiv.innerText = `Uploading ${file.name}...`;
+
+            // Create FormData and append the file with the key 'file'
+            // This key MUST match request.files['file'] in your Flask route
+            const formData = new FormData();
+            formData.append('file', file);
+
+            // Send the POST request to your Flask backend
+            fetch('/upload-audio', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    statusDiv.style.color = 'red';
+                    statusDiv.innerText = `Error: ${data.error}`;
+                } else {
+                    statusDiv.style.color = 'green';
+                    statusDiv.innerText = data.message;
+                }
+            })
+            .catch(error => {
+                console.error('Upload Error:', error);
+                statusDiv.style.color = 'red';
+                statusDiv.innerText = 'An error occurred during upload.';
+            });
+        }
+    </script>
+</body>
+</html>
