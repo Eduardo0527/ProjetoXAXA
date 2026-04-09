@@ -1,5 +1,4 @@
-#SISTEMA DISTRIBUÍDO DE
-DETECÇÃO E CLASSIFICAÇÃO SONORA PARA ACESSIBILIDADE DOMÉSTICA
+# SISTEMA DISTRIBUÍDO DE DETECÇÃO E CLASSIFICAÇÃO SONORA PARA ACESSIBILIDADE DOMÉSTICA
 
 O presente projeto propõe o desenvolvimento
 de um sistema de Internet das Coisas (IoT) distribuído e de baixo custo (RAY,
