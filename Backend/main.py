@@ -67,7 +67,6 @@ manager = ConnectionManager()
 @app.websocket("/ws/alerts")
 async def websocket_endpoint(websocket: WebSocket):
     await manager.connect(websocket)
-    print("haha")
     try:
         while True:
             data = await websocket.receive_text()
