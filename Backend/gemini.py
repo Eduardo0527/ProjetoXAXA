@@ -2,8 +2,11 @@ import os
 from google import genai
 import time
 from google.genai import types
+from dotenv import load_dotenv
 
-API_KEY = 'AIzaSyAnrBGGKv3iOylkPSPtgE68DgnTiQ9mFOE'
+load_dotenv()
+
+API_KEY = os.getenv("API_KEY")
 
 
 model_name = 'gemini-2.5-flash'

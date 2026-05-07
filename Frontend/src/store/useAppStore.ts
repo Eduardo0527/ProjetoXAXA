@@ -11,6 +11,7 @@ export interface Alert {
   room: string;
   time: string;
   severity: Severity;
+  description: string;
 }
 
 export interface Sensor {
@@ -29,9 +30,9 @@ interface AppState {
 }
 
 const MOCK_ALERTS: Alert[] = [
-  { id: '1', hz: 3200, db: 92, room: 'Kitchen', time: '21:00', severity: 'HIGH' },
-  { id: '2', hz: 1800, db: 78, room: 'Front door', time: '20:32', severity: 'MEDIUM' },
-  { id: '3', hz: 500, db: 70, room: "Maria's room", time: '19:32', severity: 'MEDIUM' },
+  { id: '1', hz: 3200, db: 92, room: 'Kitchen', time: '21:00', severity: 'HIGH', description: "haha" },
+  { id: '2', hz: 1800, db: 78, room: 'Front door', time: '20:32', severity: 'MEDIUM', description: "haha" },
+  { id: '3', hz: 500, db: 70, room: "Maria's room", time: '19:32', severity: 'MEDIUM', description: "haha" },
 ];
 
 const MOCK_SENSORS: Sensor[] = [
