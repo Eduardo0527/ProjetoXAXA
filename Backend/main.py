@@ -5,7 +5,9 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, Request, File, UploadFile, Form, status, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
+
 
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
@@ -17,6 +19,13 @@ import gemini
 
 app = FastAPI()
 
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.add_middleware(
     SessionMiddleware, 
@@ -83,11 +92,6 @@ async def upload_audio(request: Request, file: UploadFile = File(...)):
         return JSONResponse({"error": "No selected file"}, status_code=400)  
     
     actual_mimetype = file.content_type
-    safe_filename = secure_filename(file.filename)
-    file_path = os.path.join(UPLOAD_FOLDER, safe_filename)
-    
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
         
     classification = await gemini.process_audio(file_path, actual_mimetype)
     
@@ -114,7 +118,7 @@ async def upload_audio(request: Request, file: UploadFile = File(...)):
             "hz": 0, # mockado mas acho que vamo tirar(acho q não vamos medir frequência?)
             "db": 85, # mockado
             "room": "Desconhecido", # mockado
-            "severity": "high" if "chorando" in classification.lower() or "quebrando" in classification.lower() else "low", #também mockado por enquanto, acho que a gente vai classificar por decibeis
+            "severity": "HIGH" if "chorando" in classification.lower() or "quebrando" in classification.lower() else "LOW", #também mockado por enquanto, acho que a gente vai classificar por decibeis
             "classification": classification
         }
     }
@@ -165,23 +169,33 @@ def logout(request: Request):
 def login_get(request: Request):
     return templates.TemplateResponse(request=request, name="login.html")
 
-@app.post('/login')
-def login_post(request: Request, username: str = Form(...), password: str = Form(...)):
+@app.get('/me')
+def get_current_user(request: Request):
+    username = request.session.get("username")
+    if not username:
+        return JSONResponse({'error': 'Not authenticated'}, status_code=401)
+    return JSONResponse({"username": username}, status_code=200)
+
+@app.post('/api/login')
+def api_login_post(request: Request, username: str = Form(...), password: str = Form(...)):
     con = db_pool.get_connection()
     cursor = con.cursor()
-    
     try:
-        query = "SELECT p_password FROM users WHERE p_username = %s;"
+        query = "SELECT p_id, p_password FROM users WHERE p_username = %s;"
         cursor.execute(query, (username,))
         row = cursor.fetchone()
         
-        if row and check_password_hash(row[0], password):
-            print("Login successful")
+        if row and check_password_hash(row[1], password):
             request.session['username'] = username
-            return RedirectResponse(url=f"/success/{username}", status_code=status.HTTP_303_SEE_OTHER)
+            
+            user_data = {
+                "id": row[0], 
+                "username": username
+            }
+            
+            return JSONResponse({"message": "Login successful", "user": user_data}, status_code=200)
         else:
-            print("Please check the username and the password!") 
-            return templates.TemplateResponse(request=request, name='login.html', context={"error": "Invalid credentials"})
+            return JSONResponse({"error": "Invalid credentials"}, status_code=401)
     finally: 
         cursor.close()
         con.close()

@@ -2,19 +2,39 @@ import React, { useState } from 'react';
 import { 
   View, Text, TextInput, TouchableOpacity, StyleSheet, 
   KeyboardAvoidingView, Platform, TouchableWithoutFeedback, 
-  Keyboard, StatusBar 
+  Keyboard, StatusBar, Alert, ActivityIndicator
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '../hooks/useAuth';
 
 interface LoginScreenProps {
   navigation: any;
-  onLogin: () => void;
 }
 
-export const LoginScreen = ({ navigation, onLogin }: LoginScreenProps) => {
-  const [email, setEmail] = useState('');
+export const LoginScreen = ({ navigation }: LoginScreenProps) => {
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const { login } = useAuth();
+
+  const handleLogin = async () => {
+    if (!username.trim() || !password.trim()) {
+      Alert.alert('Erro', 'Por favor, preencha o usuário e a senha.');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      await login({ username, password });
+    } catch (error) {
+      Alert.alert('Falha no Login', 'Usuário ou senha incorretos. Tente novamente.');
+      console.error(error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
@@ -34,15 +54,14 @@ export const LoginScreen = ({ navigation, onLogin }: LoginScreenProps) => {
 
         <View style={styles.formContainer}>
           <View style={styles.inputContainer}>
-            <Ionicons name="mail-outline" size={20} color="#888" style={styles.inputIcon} />
+            <Ionicons name="person-outline" size={20} color="#888" style={styles.inputIcon} />
             <TextInput
               style={styles.input}
-              placeholder="E-mail ou Matrícula"
+              placeholder="Usuário ou Matrícula"
               placeholderTextColor="#666"
-              keyboardType="email-address"
               autoCapitalize="none"
-              value={email}
-              onChangeText={setEmail}
+              value={username}
+              onChangeText={setUsername}
             />
           </View>
 
@@ -68,9 +87,20 @@ export const LoginScreen = ({ navigation, onLogin }: LoginScreenProps) => {
             <Text style={styles.forgotPasswordText}>Esqueceu a senha?</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.loginButton} onPress={onLogin} activeOpacity={0.8}>
-            <Text style={styles.loginButtonText}>Acessar Sistema</Text>
-            <Ionicons name="log-in-outline" size={24} color="#000000" />
+          <TouchableOpacity 
+            style={styles.loginButton} 
+            onPress={handleLogin} 
+            activeOpacity={0.8}
+            disabled={isLoading} 
+          >
+            {isLoading ? (
+              <ActivityIndicator color="#000000" />
+            ) : (
+              <>
+                <Text style={styles.loginButtonText}>Acessar Sistema</Text>
+                <Ionicons name="log-in-outline" size={24} color="#000000" />
+              </>
+            )}
           </TouchableOpacity>
         </View>
 
