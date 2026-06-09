@@ -2,11 +2,13 @@ import os
 import shutil
 from dotenv import load_dotenv
 
-from fastapi import FastAPI, Request, File, UploadFile, Form, status, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Request, File, UploadFile, Form, status, WebSocket, WebSocketDisconnect, Header
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
+import secrets
+import hashlib
 
 
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -82,32 +84,42 @@ async def websocket_endpoint(websocket: WebSocket):
     except WebSocketDisconnect:
         manager.disconnect(websocket)
 
-@app.post('/upload-audio')
-async def upload_audio(request: Request, file: UploadFile = File(...)):
-    username = request.session.get("username")
-    if not username:
-        return JSONResponse({'error': 'User not logged in!'}, status_code=400)
-    
-    if not file.filename:
-        return JSONResponse({"error": "No selected file"}, status_code=400)  
-    
-    actual_mimetype = file.content_type
+
+@app.post('/upload-audio') 
+async def upload_sensor_data(
+    request: Request, 
+    hz: float = Form(...), 
+    db: float = Form(...), 
+    room: str = Form(...),
+    x_api_key: str = Header(None)
+):
+    if not x_api_key:
+        return JSONResponse({'error': 'Missing API Key in headers'}, status_code=401)
         
-    classification = await gemini.process_audio(file_path, actual_mimetype)
-    
     con = db_pool.get_connection()
     cursor = con.cursor()
     
+    device_id = None
+    
     try:
-        query_for_user = "SELECT p_id FROM users WHERE p_username = %s;"
-        cursor.execute(query_for_user, (username,))
+        hashed_key = hashlib.sha256(x_api_key.encode()).hexdigest()
+        
+        query_device = "SELECT device_id FROM devices WHERE api_key = %s;"
+        cursor.execute(query_device, (hashed_key,))
         row = cursor.fetchone()
         
-        if row: 
-            user_id = row[0]
-            query = "INSERT INTO sounds (sound_description, p_id) VALUES (%s, %s);"
-            cursor.execute(query, (classification, user_id))
-            con.commit()     
+        if row:
+            device_id = row[0]
+        else:
+            return JSONResponse({'error': 'Invalid API Key'}, status_code=401)
+            
+        classification = f"Ruído de {db}dB ({hz}Hz) registrado: {room}"
+        severity = "HIGH" if db > 80.0 else "LOW"
+        
+        query_insert = "INSERT INTO sounds (sound_description, device_id) VALUES (%s, %s);"
+        cursor.execute(query_insert, (classification, device_id))
+        con.commit()     
+        
     finally:
         cursor.close()
         con.close()
@@ -115,17 +127,18 @@ async def upload_audio(request: Request, file: UploadFile = File(...)):
     alert_payload = {
         "type": "ALERT",
         "data": {
-            "hz": 0, # mockado mas acho que vamo tirar(acho q não vamos medir frequência?)
-            "db": 85, # mockado
-            "room": "Desconhecido", # mockado
-            "severity": "HIGH" if "chorando" in classification.lower() or "quebrando" in classification.lower() else "LOW", #também mockado por enquanto, acho que a gente vai classificar por decibeis
+            "hz": hz,
+            "db": db,
+            "room": room,
+            "severity": severity,
             "classification": classification
         }
     }
     
     await manager.broadcast(alert_payload)
         
-    return JSONResponse({"message": f"O áudio é: {classification}"}, status_code=200)
+    return JSONResponse({"message": "Data processed successfully", "alert": alert_payload}, status_code=200)
+
 
 @app.get("/view-sounds", response_class=HTMLResponse)
 def sounds_page(request: Request):
@@ -159,6 +172,51 @@ def sounds_page(request: Request):
 def load_ui(request: Request):
     return templates.TemplateResponse(request=request, name='upload.html')
 
+@app.post('/add-device')
+def add_device(request: Request, device_name: str = Form(...)):
+    username = request.session.get("username")
+    if not username:
+        return JSONResponse({'error': 'You must be logged in to add a device'}, status_code=401)
+    
+    con = db_pool.get_connection()
+    cursor = con.cursor()
+    
+    try:
+        query_user = "SELECT p_id FROM users WHERE p_username = %s;"
+        cursor.execute(query_user, (username,))
+        user_row = cursor.fetchone()
+        
+        if not user_row:
+            return JSONResponse({'error': 'User not found'}, status_code=404)
+        
+        user_id = user_row[0]
+        
+        raw_api_key = f"esp32_{secrets.token_urlsafe(32)}"
+        
+        hashed_key = hashlib.sha256(raw_api_key.encode()).hexdigest()
+        
+        query_insert = "INSERT INTO devices (p_id, device_name, api_key) VALUES (%s, %s, %s);"
+        cursor.execute(query_insert, (user_id, device_name, hashed_key))
+        con.commit()
+        
+        return JSONResponse({
+            "message": "Device added successfully!",
+            "device_name": device_name,
+            "api_key": raw_api_key
+        }, status_code=201)
+        
+    except Exception as e:
+        return JSONResponse({'error': f"Failed to add device: {str(e)}"}, status_code=500)
+        
+    finally:
+        cursor.close()
+        con.close()
+
+@app.get("/create-device",response_class=HTMLResponse)
+def load_ui(request: Request):
+    return templates.TemplateResponse(request=request, name='create_device.html')
+    
+
 
 @app.get('/logout', response_class=HTMLResponse)
 def logout(request: Request):
@@ -168,6 +226,7 @@ def logout(request: Request):
 @app.get('/login', response_class=HTMLResponse, name="login")
 def login_get(request: Request):
     return templates.TemplateResponse(request=request, name="login.html")
+
 
 @app.get('/me')
 def get_current_user(request: Request):
