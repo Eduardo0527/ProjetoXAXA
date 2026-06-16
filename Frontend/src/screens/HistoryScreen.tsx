@@ -29,8 +29,6 @@ export const HistoryScreen = () => {
           </View>
           
           <View style={styles.metricsRow}>
-            <Text style={styles.metricText}>{item.hz} Hz</Text>
-            <Text style={styles.metricDivider}>•</Text>
             <Text style={styles.metricText}>{item.db} dB</Text>
           </View>
           

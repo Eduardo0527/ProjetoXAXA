@@ -6,7 +6,6 @@ export type Severity = 'HIGH' | 'MEDIUM' | 'LOW';
 
 export interface Alert {
   id: string;
-  hz: number;
   db: number;
   room: string;
   time: string;
@@ -30,9 +29,9 @@ interface AppState {
 }
 
 const MOCK_ALERTS: Alert[] = [
-  { id: '1', hz: 3200, db: 92, room: 'Kitchen', time: '21:00', severity: 'HIGH', description: "haha" },
-  { id: '2', hz: 1800, db: 78, room: 'Front door', time: '20:32', severity: 'MEDIUM', description: "haha" },
-  { id: '3', hz: 500, db: 70, room: "Maria's room", time: '19:32', severity: 'MEDIUM', description: "haha" },
+  { id: '1',  db: 92, room: 'Kitchen', time: '21:00', severity: 'HIGH', description: "haha" },
+  { id: '2', db: 78, room: 'Front door', time: '20:32', severity: 'MEDIUM', description: "haha" },
+  { id: '3', db: 70, room: "Maria's room", time: '19:32', severity: 'MEDIUM', description: "haha" },
 ];
 
 const MOCK_SENSORS: Sensor[] = [

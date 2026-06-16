@@ -65,7 +65,7 @@ export const HomeScreen = () => {
         <Ionicons name="pulse-outline" size={20} color="#00D1FF" />
       </View>
       <View style={styles.recentInfo}>
-        <Text style={styles.recentTitle}>{item.hz} Hz • {item.db} dB</Text>
+        <Text style={styles.recentTitle}>{item.db} dB</Text>
         <Text style={styles.recentSubtitle}>{item.room}</Text>
       </View>
       <Text style={styles.recentTime}>{item.time}</Text>
@@ -96,7 +96,6 @@ export const HomeScreen = () => {
             <Text style={styles.mainUnit}>dB</Text>
           </View>
           
-          <Text style={styles.mainDb}>Ruído: {latestAlert.hz} Hz</Text>
           
           <SeverityBadge severity={latestAlert.severity} />
           

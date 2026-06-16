@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useAppStore } from '../store/useAppStore';
 
-const FASTAPI_WS_URL = 'ws://192.168.0.169:5000/ws/alerts';
+const FASTAPI_WS_URL = 'wss://caused-congratulations-oaks-bearing.trycloudflare.com/ws/alerts';
 
 export const useRadxaConnection = () => {
   const ws = useRef<WebSocket | null>(null);
@@ -25,7 +25,6 @@ export const useRadxaConnection = () => {
           if (payload.type === 'ALERT') {
             addAlert({
               id: Date.now().toString(),
-              hz: payload.data.hz,
               db: payload.data.db,
               room: payload.data.room,
               time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
