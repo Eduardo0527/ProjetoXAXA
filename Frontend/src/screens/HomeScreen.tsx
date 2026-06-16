@@ -92,11 +92,11 @@ export const HomeScreen = () => {
           </View>
           
           <View style={styles.hzContainer}>
-            <Text style={styles.mainValue}>{latestAlert.hz}</Text>
-            <Text style={styles.mainUnit}>Hz</Text>
+            <Text style={styles.mainValue}>{latestAlert.db}</Text>
+            <Text style={styles.mainUnit}>dB</Text>
           </View>
           
-          <Text style={styles.mainDb}>Ruído: {latestAlert.db} dB</Text>
+          <Text style={styles.mainDb}>Ruído: {latestAlert.hz} Hz</Text>
           
           <SeverityBadge severity={latestAlert.severity} />
           

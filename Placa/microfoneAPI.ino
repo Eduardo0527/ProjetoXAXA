@@ -26,9 +26,6 @@ const String roomName = "Sala_1";
 
 int32_t samples[BUFFER_LEN];
 
-// ============================================================================
-// PARÂMETROS DE DETECÇÃO E TEMPO
-// ============================================================================
 const double ALARM_THRESHOLD = 60.0;     // Dispara o envio imediato se passar deste valor em dB
 unsigned long lastPeriodicSend = 0;      // Guarda o tempo do último envio de rotina
 const unsigned long PERIODIC_INTERVAL = 10000; // Envia uma leitura padrão a cada 10 segundos

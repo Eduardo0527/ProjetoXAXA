@@ -17,9 +17,10 @@ from werkzeug.utils import secure_filename
 import mysql.connector
 from mysql.connector import pooling
 
-import gemini
 
 app = FastAPI()
+
+load_dotenv()
 
 
 app.add_middleware(
