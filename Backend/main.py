@@ -89,7 +89,6 @@ async def websocket_endpoint(websocket: WebSocket):
 @app.post('/upload-audio') 
 async def upload_sensor_data(
     request: Request, 
-    hz: float = Form(...), 
     db: float = Form(...), 
     room: str = Form(...),
     x_api_key: str = Header(None)
@@ -114,7 +113,7 @@ async def upload_sensor_data(
         else:
             return JSONResponse({'error': 'Invalid API Key'}, status_code=401)
             
-        classification = f"Ruído de {db}dB ({hz}Hz) registrado: {room}"
+        classification = f"Ruído de {db}dB registrado: {room}"
         severity = "HIGH" if db > 80.0 else "LOW"
         
         query_insert = "INSERT INTO sounds (sound_description, device_id) VALUES (%s, %s);"
@@ -128,7 +127,6 @@ async def upload_sensor_data(
     alert_payload = {
         "type": "ALERT",
         "data": {
-            "hz": hz,
             "db": db,
             "room": room,
             "severity": severity,
