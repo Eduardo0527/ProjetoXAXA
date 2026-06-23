@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, FlatList, StatusBar, TouchableOpacity, Animated } from 'react-native';
+import { 
+  View, Text, StyleSheet, FlatList, StatusBar, 
+  TouchableOpacity, Animated, Alert as RNAlert 
+} from 'react-native';
 import { useAppStore, Alert } from '../store/useAppStore';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -59,6 +62,25 @@ export const HomeScreen = () => {
     outputRange: ['#121212', '#2A0808']
   });
 
+  // FUNÇÃO DE LOGOUT (Com confirmação)
+  const handleLogout = () => {
+    RNAlert.alert(
+      "Sair do Sistema",
+      "Deseja realmente desconectar da sua conta?",
+      [
+        { text: "Cancelar", style: "cancel" },
+        { 
+          text: "Sair", 
+          style: "destructive",
+          onPress: () => {
+            console.log("Logout confirmado!");
+            // A lógica de resetar o app entrará aqui
+          }
+        }
+      ]
+    );
+  };
+
   const renderRecentItem = ({ item }: { item: Alert }) => (
     <View style={styles.recentCard}>
       <View style={styles.iconCircle}>
@@ -76,7 +98,17 @@ export const HomeScreen = () => {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
       
-      <Text style={styles.headerTitle}>Último Alerta</Text>
+      {/* CABEÇALHO NOVO COM O BOTÃO DE LOGOUT */}
+      <View style={styles.headerContainer}>
+        <Text style={styles.headerTitle}>Último Alerta</Text>
+        <TouchableOpacity 
+          style={styles.logoutButton} 
+          onPress={handleLogout} 
+          activeOpacity={0.7}
+        >
+          <Ionicons name="log-out-outline" size={24} color="#FF4B4B" />
+        </TouchableOpacity>
+      </View>
       
       {latestAlert && (
         <Animated.View style={[
@@ -95,7 +127,6 @@ export const HomeScreen = () => {
             <Text style={styles.mainValue}>{latestAlert.db}</Text>
             <Text style={styles.mainUnit}>dB</Text>
           </View>
-          
           
           <SeverityBadge severity={latestAlert.severity} />
           
@@ -129,7 +160,7 @@ export const HomeScreen = () => {
         </Animated.View>
       )}
 
-      <Text style={[styles.headerTitle, { marginTop: 24 }]}>Detecções Recentes</Text>
+      <Text style={[styles.headerTitle, { marginTop: 24, marginBottom: 16 }]}>Detecções Recentes</Text>
       
       <FlatList
         data={recentAlerts}
@@ -143,7 +174,11 @@ export const HomeScreen = () => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000000', paddingHorizontal: 20, paddingTop: 50, paddingBottom: 110 },
-  headerTitle: { fontSize: 28, fontWeight: 'bold', color: '#00D1FF', marginBottom: 16 },
+  
+  // ESTILOS NOVOS DO CABEÇALHO
+  headerContainer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  headerTitle: { fontSize: 28, fontWeight: 'bold', color: '#00D1FF' },
+  logoutButton: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#1A0808', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#331111' },
   
   mainCard: {
     borderWidth: 2, 

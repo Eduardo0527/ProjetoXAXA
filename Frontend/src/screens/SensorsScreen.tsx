@@ -1,16 +1,30 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, StatusBar, FlatList, TouchableOpacity, Modal } from 'react-native';
+import { 
+  View, Text, StyleSheet, StatusBar, FlatList, 
+  TouchableOpacity, Modal, TextInput, KeyboardAvoidingView, Platform 
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-const SENSORS_DATA = [
-  { id: '1', name: 'Mic Principal', room: 'Sala de Estar', status: 'ONLINE', battery: '98%' },
-  { id: '2', name: 'Mic Janela', room: 'Quarto 1', status: 'ONLINE', battery: '75%' },
-  { id: '3', name: 'Sensor Externo', room: 'Varanda', status: 'OFFLINE', battery: '0%' },
-  { id: '4', name: 'Mic Cozinha', room: 'Cozinha', status: 'WARNING', battery: '15%' },
-];
+// Tipagem do Sensor
+type Sensor = {
+  id: string;
+  name: string;
+  room: string;
+  status: 'ONLINE' | 'WARNING' | 'OFFLINE';
+  battery: string;
+};
 
 export function SensorsScreen() {
-  const [modalVisible, setModalVisible] = useState(false);
+  // Estado que armazena os sensores (agora começa vazio, sem mocks)
+  const [sensors, setSensors] = useState<Sensor[]>([]);
+  
+  // Controle dos modais
+  const [infoModalVisible, setInfoModalVisible] = useState(false);
+  const [addModalVisible, setAddModalVisible] = useState(false);
+
+  // Estados do formulário do novo sensor
+  const [newName, setNewName] = useState('');
+  const [newRoom, setNewRoom] = useState('');
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -21,7 +35,24 @@ export function SensorsScreen() {
     }
   };
 
-  const renderSensorCard = ({ item }: { item: typeof SENSORS_DATA[0] }) => (
+  const handleAddSensor = () => {
+    if (newName.trim() === '' || newRoom.trim() === '') return;
+
+    const newSensor: Sensor = {
+      id: Date.now().toString(), // Gera um ID único baseado na data
+      name: newName,
+      room: newRoom,
+      status: 'ONLINE', // Por padrão, o novo sensor entra como online
+      battery: '100%',  // Bateria cheia por padrão
+    };
+
+    setSensors((prev) => [...prev, newSensor]);
+    setAddModalVisible(false);
+    setNewName('');
+    setNewRoom('');
+  };
+
+  const renderSensorCard = ({ item }: { item: Sensor }) => (
     <View style={styles.sensorCard}>
       <View style={styles.cardHeader}>
         <View style={styles.iconContainer}>
@@ -51,9 +82,14 @@ export function SensorsScreen() {
       <View style={styles.header}>
         <View style={styles.headerTopRow}>
           <Text style={styles.title}>Rede Radxa</Text>
-          <TouchableOpacity onPress={() => setModalVisible(true)} style={styles.infoButton}>
-            <Ionicons name="information-circle-outline" size={28} color="#00D1FF" />
-          </TouchableOpacity>
+          <View style={styles.headerIcons}>
+            <TouchableOpacity onPress={() => setAddModalVisible(true)} style={styles.iconButton}>
+              <Ionicons name="add-circle-outline" size={28} color="#00E676" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setInfoModalVisible(true)} style={styles.iconButton}>
+              <Ionicons name="information-circle-outline" size={28} color="#00D1FF" />
+            </TouchableOpacity>
+          </View>
         </View>
         <Text style={styles.description}>
           Acompanhe o status físico e a bateria dos módulos captadores espalhados pelo ambiente.
@@ -61,19 +97,85 @@ export function SensorsScreen() {
       </View>
 
       <FlatList
-        data={SENSORS_DATA}
+        data={sensors}
         keyExtractor={item => item.id}
         renderItem={renderSensorCard}
         numColumns={2}
         columnWrapperStyle={styles.row}
         showsVerticalScrollIndicator={false}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Ionicons name="radio-outline" size={48} color="#222" />
+            <Text style={styles.emptyText}>Nenhum sensor cadastrado.</Text>
+            <Text style={styles.emptySubText}>Clique no botão + para adicionar.</Text>
+          </View>
+        }
       />
 
+      {/* MODAL DE ADICIONAR SENSOR */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={addModalVisible}
+        onRequestClose={() => setAddModalVisible(false)}
+      >
+        <KeyboardAvoidingView 
+          style={styles.modalOverlay} 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Ionicons name="add-circle" size={24} color="#00E676" />
+              <Text style={styles.modalTitle}>Adicionar Sensor</Text>
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Nome do Módulo</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Ex: Mic Janela Principal"
+                placeholderTextColor="#666"
+                value={newName}
+                onChangeText={setNewName}
+              />
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Ambiente / Localização</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Ex: Sala de Máquinas"
+                placeholderTextColor="#666"
+                value={newRoom}
+                onChangeText={setNewRoom}
+              />
+            </View>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity 
+                style={[styles.actionButton, styles.cancelButton]} 
+                onPress={() => setAddModalVisible(false)}
+              >
+                <Text style={styles.cancelButtonText}>Cancelar</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[styles.actionButton, styles.addButton]} 
+                onPress={handleAddSensor}
+              >
+                <Text style={styles.addButtonText}>Adicionar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* MODAL DE LEGENDA DE STATUS (MANTIDO) */}
       <Modal
         animationType="fade"
         transparent={true}
-        visible={modalVisible}
-        onRequestClose={() => setModalVisible(false)}
+        visible={infoModalVisible}
+        onRequestClose={() => setInfoModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -108,7 +210,7 @@ export function SensorsScreen() {
 
             <TouchableOpacity 
               style={styles.closeButton} 
-              onPress={() => setModalVisible(false)}
+              onPress={() => setInfoModalVisible(false)}
             >
               <Text style={styles.closeButtonText}>Entendi</Text>
             </TouchableOpacity>
@@ -125,12 +227,20 @@ const styles = StyleSheet.create({
   header: { marginBottom: 24 },
 
   headerTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  infoButton: { padding: 4 },
+  headerIcons: { flexDirection: 'row', gap: 12 },
+  iconButton: { padding: 4 },
   
   title: { color: '#00D1FF', fontSize: 28, fontWeight: 'bold' },
   description: { color: '#888888', fontSize: 14, lineHeight: 20 },
   
   row: { justifyContent: 'space-between', marginBottom: 16 },
+  
+  // Lista Vazia
+  emptyContainer: { alignItems: 'center', justifyContent: 'center', marginTop: 80, paddingHorizontal: 20 },
+  emptyText: { color: '#888888', fontSize: 18, fontWeight: 'bold', marginTop: 16 },
+  emptySubText: { color: '#555555', fontSize: 14, marginTop: 8, textAlign: 'center' },
+
+  // Card do Sensor
   sensorCard: { backgroundColor: '#121212', borderRadius: 20, padding: 16, width: '48%', borderWidth: 1, borderColor: '#222' },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
   iconContainer: { backgroundColor: '#002B36', padding: 10, borderRadius: 12 },
@@ -141,6 +251,7 @@ const styles = StyleSheet.create({
   footerItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   footerText: { color: '#888888', fontSize: 10, fontWeight: 'bold' },
 
+  // Modais Compartilhados
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.75)',
@@ -163,46 +274,28 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   modalTitle: {
-    color: '#00D1FF',
+    color: '#FFFFFF',
     fontSize: 20,
     fontWeight: 'bold',
   },
-  modalLegendItem: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 20,
-    gap: 16,
-  },
-  modalDot: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    marginTop: 2,
-  },
-  modalLegendTextContainer: {
-    flex: 1,
-  },
-  modalLegendTitle: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  modalLegendDesc: {
-    color: '#888888',
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  closeButton: {
-    backgroundColor: '#002B36',
-    paddingVertical: 14,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  closeButtonText: {
-    color: '#00D1FF',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
+
+  // Modal de Formulário
+  inputContainer: { marginBottom: 16 },
+  inputLabel: { color: '#888888', fontSize: 14, marginBottom: 8, fontWeight: '500' },
+  input: { backgroundColor: '#000000', borderWidth: 1, borderColor: '#333', borderRadius: 12, color: '#FFFFFF', paddingHorizontal: 16, height: 50, fontSize: 16 },
+  modalActions: { flexDirection: 'row', gap: 12, marginTop: 12 },
+  actionButton: { flex: 1, height: 50, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+  cancelButton: { backgroundColor: 'transparent', borderWidth: 1, borderColor: '#333' },
+  cancelButtonText: { color: '#888888', fontSize: 16, fontWeight: 'bold' },
+  addButton: { backgroundColor: '#00E676' },
+  addButtonText: { color: '#000000', fontSize: 16, fontWeight: 'bold' },
+
+  // Modal de Legenda (Mantido)
+  modalLegendItem: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 20, gap: 16 },
+  modalDot: { width: 14, height: 14, borderRadius: 7, marginTop: 2 },
+  modalLegendTextContainer: { flex: 1 },
+  modalLegendTitle: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold', marginBottom: 4 },
+  modalLegendDesc: { color: '#888888', fontSize: 14, lineHeight: 20 },
+  closeButton: { backgroundColor: '#002B36', paddingVertical: 14, borderRadius: 12, alignItems: 'center', marginTop: 10 },
+  closeButtonText: { color: '#00D1FF', fontSize: 16, fontWeight: 'bold' },
 });
