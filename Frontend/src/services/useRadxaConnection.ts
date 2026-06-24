@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useAppStore } from '../store/useAppStore';
 
-const FASTAPI_WS_URL = 'wss://caused-congratulations-oaks-bearing.trycloudflare.com/ws/alerts';
+const FASTAPI_WS_URL = 'wss://plaintiff-don-larger-spokesman.trycloudflare.com/ws/alerts';
 
 export const useRadxaConnection = () => {
   const ws = useRef<WebSocket | null>(null);

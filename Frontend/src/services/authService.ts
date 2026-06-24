@@ -6,7 +6,7 @@ export const authService = {
     formData.append("username", credentials.username);
     formData.append("password", credentials.password);
 
-    const response = await fetch("https://caused-congratulations-oaks-bearing.trycloudflare.com/api/login", {
+    const response = await fetch("https://plaintiff-don-larger-spokesman.trycloudflare.com/api/login", {
       method: "POST",
       body: formData,
       credentials: "include",
@@ -20,7 +20,7 @@ export const authService = {
   },
 
   getMe: async () => {
-    const response = await fetch("https://caused-congratulations-oaks-bearing.trycloudflare.com/me", {
+    const response = await fetch("https://plaintiff-don-larger-spokesman.trycloudflare.com/me", {
       method: "GET",
       credentials: "include",
     });
@@ -29,7 +29,7 @@ export const authService = {
   },
 
   logout: async () => {
-    await fetch("https://caused-congratulations-oaks-bearing.trycloudflare.com/logout", {
+    await fetch("https://plaintiff-don-larger-spokesman.trycloudflare.com/logout", {
       method: "GET",
       credentials: "include",
     });

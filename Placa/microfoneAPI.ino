@@ -9,8 +9,8 @@
 // ============================================================================
 String ssid = "";
 String password = "";
-const char* serverName = "http://192.168.1.100:5000/upload-audio"; 
-const char* apiKey = "YOUR_RAW_API_KEY_HERE"; 
+const char* serverName = "https://plaintiff-don-larger-spokesman.trycloudflare.com/upload-audio"; 
+const char* apiKey = "esp32_SKOWqQdc4mdP4SHjLrTpzyVRIMm7Hg4hKlVJUC8MU1Q"; 
 const String roomName = "Sala_1";
 
 // ============================================================================
@@ -26,11 +26,19 @@ const String roomName = "Sala_1";
 
 int32_t samples[BUFFER_LEN];
 
-const double ALARM_THRESHOLD = 60.0;     // Dispara o envio imediato se passar deste valor em dB
-unsigned long lastPeriodicSend = 0;      // Guarda o tempo do último envio de rotina
-const unsigned long PERIODIC_INTERVAL = 10000; // Envia uma leitura padrão a cada 10 segundos
-unsigned long lastAlertSend = 0;         // Evita inundar a API com alertas repetidos
-const unsigned long ALERT_COOLDOWN = 3000;    // Janela de 3 segundos entre alertas pós-pico
+// ============================================================================
+// PARÂMETROS DE DETECÇÃO E TEMPO (LIMIAR DINÂMICO)
+// ============================================================================
+// Parâmetros do Filtro Passa-Baixa para o Ruído de Fundo
+static double background_noise = 0.0;  // Começa em 0, será ajustado na primeira leitura
+static bool is_calibrated = false;     // Controle para a primeira medição
+const double ALPHA = 0.02;                   // Taxa de aprendizagem lenta (ajusta-se ao ambiente ao longo do tempo)
+const double SPIKE_THRESHOLD = 15.0;         // Dispara o alerta se o som subir 15 dB acima do ruído de fundo
+
+unsigned long lastPeriodicSend = 0;          // Guarda o tempo do último envio de rotina
+const unsigned long PERIODIC_INTERVAL = 60000; // Envia telemetria a cada 60 segundos
+unsigned long lastAlertSend = 0;             // Evita inundar a API com alertas repetidos
+const unsigned long ALERT_COOLDOWN = 3000;    // Janela de 3 segundos entre alertas de pico
 
 // Função auxiliar para encapsular o envio HTTP POST
 void sendDataToAPI(float db, float hz) {
@@ -41,7 +49,7 @@ void sendDataToAPI(float db, float hz) {
         http.addHeader("Content-Type", "application/x-www-form-urlencoded");
         http.addHeader("x-api-key", apiKey);
 
-        // Monta o payload idêntico ao esperado pelo FastAPI
+        // Monta o payload esperado pelo FastAPI
         String httpRequestData = "hz=" + String(hz, 1) + "&db=" + String(db, 1) + "&room=" + roomName;
         
         Serial.print("-> Enviando API: ");
@@ -64,29 +72,34 @@ void sendDataToAPI(float db, float hz) {
 
 void setup() {
     Serial.begin(115200);
-    delay(1000); // Dá um tempo para o terminal abrir
 
-    // Limpa qualquer lixo que tenha ficado no buffer da porta Serial
+    while (!Serial) {
+        delay(10);
+    }
+
+    delay(3000); // Dá um tempo para o terminal abrir
+
+    // Limpa lixo do buffer da porta Serial
     while (Serial.available()) {
         Serial.read();
     }
 
     Serial.println("\n=================================");
-    Serial.println("  CONFIGURAÇÃO DE REDE WI-FI");
+    Serial.println("   CONFIGURAÇÃO DE REDE WI-FI");
     Serial.println("=================================");
     
-    // 1. Pede o SSID (Nome da Rede)
+    // 1. Pede o SSID
     Serial.println("> Digite o nome da rede (SSID) e pressione ENTER:");
     while (Serial.available() == 0) {
-        delay(100); // Fica preso aqui esperando o usuário digitar algo
+        delay(100);
     }
-    ssid = Serial.readStringUntil('\n'); // Lê até o enter
-    ssid.trim(); // Remove espaços em branco ou quebras de linha acidentais
+    ssid = Serial.readStringUntil('\n');
+    ssid.trim();
 
     // 2. Pede a Senha
     Serial.println("> Digite a senha do Wi-Fi e pressione ENTER:");
     while (Serial.available() == 0) {
-        delay(100); // Fica preso aqui esperando a senha
+        delay(100);
     }
     password = Serial.readStringUntil('\n');
     password.trim();
@@ -95,7 +108,6 @@ void setup() {
     Serial.print("Tentando conectar em: ");
     Serial.println(ssid);
 
-    // 3. Conexão Wi-Fi (usamos .c_str() para converter String de volta para const char*)
     WiFi.begin(ssid.c_str(), password.c_str());
     
     int tentativas = 0;
@@ -111,7 +123,6 @@ void setup() {
         Serial.println(WiFi.localIP());
     } else {
         Serial.println("\nFALHA NA CONEXÃO! Reinicie o ESP32 e tente novamente.");
-        // Você pode colocar um while(true); aqui se quiser travar o código em caso de erro
     }
 
     // 2. Configuração do Driver I2S
@@ -119,7 +130,7 @@ void setup() {
         .mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_RX),
         .sample_rate = SAMPLE_RATE,
         .bits_per_sample = I2S_BITS_PER_SAMPLE_32BIT,
-        .channel_format = I2S_CHANNEL_FMT_ONLY_LEFT, // Configuração corrigida para mono
+        .channel_format = I2S_CHANNEL_FMT_ONLY_LEFT, // Mono
         .communication_format = I2S_COMM_FORMAT_STAND_I2S,
         .intr_alloc_flags = ESP_INTR_FLAG_LEVEL1,
         .dma_buf_count = 8,
@@ -152,7 +163,7 @@ void setup() {
 void loop() {
     size_t bytes_read;
 
-    // Leitura contínua do barramento I2S (Bloqueia apenas até o buffer encher: ~32ms)
+    // Leitura contínua do barramento I2S
     i2s_read(I2S_PORT, samples, sizeof(samples), &bytes_read, portMAX_DELAY);
 
     int samples_read = bytes_read / sizeof(int32_t);
@@ -161,67 +172,97 @@ void loop() {
     // Tratamento de Offset DC
     double mean = 0;
     for (int i = 0; i < samples_read; i++) {
-        int32_t sample = samples[i] >> 8; 
+        int32_t sample = samples[i] >> 8; // Alinha os 24 bits úteis do INMP441
         mean += sample;
     }
     mean /= samples_read;
 
-    // Cálculo de RMS e detecção de pico absoluto no buffer
+    // Cálculo de RMS
     double sum = 0;
-    double max_amplitude = 0;
-
     for (int i = 0; i < samples_read; i++) {
         int32_t sample = samples[i] >> 8;
         double centered = (double)sample - mean;
         sum += (centered * centered);
-
-        if (fabs(centered) > max_amplitude) {
-            max_amplitude = fabs(centered);
-        }
     }
 
     double rms = sqrt(sum / samples_read);
-    if (rms < 1) rms = 1; 
+    if (rms < 1.0) rms = 1.0; 
 
-    // Conversão para dB com a calibração ajustada por você
-    double calibration_offset = -50.0; 
-    double db = 20.0 * log10(rms) + calibration_offset;
+    // ========================================================================
+    // CALIBRAÇÃO MATEMÁTICA PARA dB SPL REAL
+    // ========================================================================
+    // O valor máximo absoluto (Full Scale) para 24 bits é 2^23 = 8388608.0
+    double dbfs = 20.0 * log10(rms / 8388608.0);
+    
+    // Converte de dBFS para dB SPL baseando-se na sensibilidade de -26 dBFS @ 94dB SPL do datasheet
+    double db = dbfs + 120.0; 
 
-    // Frequência fictícia/estimada para preencher o parâmetro hz exigido pelo servidor
-    float currentHz = 440.0; 
-
+    float currentHz = 440.0; // Frequência estática padrão (substituível por FFT se necessário)
     unsigned long currentMillis = millis();
 
     // ========================================================================
-    // ESTRATÉGIA DE ENVIO INTELIGENTE
+    // ADAPTAÇÃO DINÂMICA DO RUÍDO DE FUNDO (FILTRO ASSIMÉTRICO)
+    // ========================================================================
+    const double ALPHA_UP = 0.02;   // Sobe devagar (para não engolir picos reais)
+    const double ALPHA_DOWN = 0.1;  // Desce rápido (recupera a sensibilidade rápido no silêncio)
+
+    if (!is_calibrated) {
+        background_noise = db; 
+        is_calibrated = true;
+        Serial.print("Ruído de fundo inicial calibrado para: ");
+        Serial.println(background_noise);
+    }
+
+    // Lógica Assimétrica de Adaptação
+    if (db < background_noise) {
+        // Cenário A: Ficou mais silencioso (Ar condicionado desligou).
+        // Desce RÁPIDO para o sensor voltar a ficar sensível.
+        background_noise = (background_noise * (1.0 - ALPHA_DOWN)) + (db * ALPHA_DOWN);
+        
+    } else if (db < (background_noise + 5.0)) {
+        // Cenário B: Som ambiente normal variando um pouco para cima.
+        // Sobe DEVAGAR para não confundir conversas rápidas com aumento de ruído de fundo.
+        background_noise = (background_noise * (1.0 - ALPHA_UP)) + (db * ALPHA_UP);
+        
+    } else {
+        // Cenário C: Válvula de escape (Som muito alto e constante, ar condicionado ligou).
+        // Sobe SUPER DEVAGAR para se adaptar ao novo ambiente se o barulho for permanente.
+        background_noise = (background_noise * (1.0 - (ALPHA_UP/10))) + (db * (ALPHA_UP/10));
+    }
+
+    // ========================================================================
+    // ESTRATÉGIA DE ENVIO INTELIGENTE (LIMIAR DINÂMICO)
     // ========================================================================
 
-    // Cenário A: O som ultrapassou o limite (Pico detectado!)
-    if (db >= ALARM_THRESHOLD) {
-        // Verifica se já passou o tempo de cooldown para não sobrecarregar o servidor
+    // Cenário A: O som atual ultrapassou o ruído de fundo somado ao delta do pico
+    if (db >= (background_noise + SPIKE_THRESHOLD)) {
         if (currentMillis - lastAlertSend >= ALERT_COOLDOWN) {
             Serial.print("⚠️ PICO DETECTADO! Nível: ");
             Serial.print(db, 1);
-            Serial.println(" dB. Disparando API...");
+            Serial.print(" dB SPL | Ruído de Fundo: ");
+            Serial.print(background_noise, 1);
+            Serial.println(" dB SPL. Disparando API...");
             
             sendDataToAPI(db, currentHz);
             
             lastAlertSend = currentMillis;
-            lastPeriodicSend = currentMillis; // Reseta o cronômetro periódico para não duplicar envios
+            lastPeriodicSend = currentMillis; // Reseta o intervalo periódico para evitar concorrência
         }
     } 
-    // Cenário B: Envio periódico normal de rotina (Apenas para telemetria/gráfico de histórico)
+    // Cenário B: Atualização periódica normal (Telemetria/Histórico)
     else if (currentMillis - lastPeriodicSend >= PERIODIC_INTERVAL) {
-        Serial.print("Atualização de rotina: ");
+        Serial.print("Atualização de rotina | Ambiente: ");
         Serial.print(db, 1);
-        Serial.println(" dB");
+        Serial.print(" dB SPL | Média Móvel: ");
+        Serial.print(background_noise, 1);
+        Serial.println(" dB SPL");
         
         sendDataToAPI(db, currentHz);
         
         lastPeriodicSend = currentMillis;
     }
     
-    // Verificação de segurança de conexão Wi-Fi em background
+    // Verificação de segurança da conexão Wi-Fi
     if (WiFi.status() != WL_CONNECTED && currentMillis % 5000 == 0) {
         Serial.println("WiFi caiu. Tentando reconectar...");
         WiFi.reconnect();
