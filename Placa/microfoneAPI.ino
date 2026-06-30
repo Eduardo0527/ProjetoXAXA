@@ -12,12 +12,12 @@ String ssid     = "";
 String password = "";
 
 // HTTP — spike alerts only
-const char*   serverName = "investor-lamps-marion-periodically.trycloudflare.com/upload-audio";
+const char*   serverName = "http://192.168.0.169:5000/upload-audio";
 const char*   apiKey     = "esp32_SKOWqQdc4mdP4SHjLrTpzyVRIMm7Hg4hKlVJUC8MU1Q";
 const String  roomName   = "Sala_1";
 
 // WebSocket — continuous 500ms stream
-const char* wsHost = "https://investor-lamps-marion-periodically.trycloudflare.com";
+const char* wsHost = "192.168.0.169";
 const char* wsPath = "/ws/sensor";
 
 // ============================================================================
@@ -138,7 +138,7 @@ void setup() {
     }
 
     // WebSocket — connects here and stays connected
-    wsClient.beginSSL(wsHost, 443, wsPath);
+    wsClient.begin(wsHost, 5000, wsPath);
     wsClient.onEvent(onWsEvent);
     wsClient.setReconnectInterval(3000);
 
