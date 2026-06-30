@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, FlatList, StatusBar, TouchableOpacity, Animated } from 'react-native';
+import { View, Text, StyleSheet, FlatList, StatusBar, TouchableOpacity, Animated, Modal } from 'react-native';
 import { useAppStore, Alert } from '../store/useAppStore';
 import { Ionicons } from '@expo/vector-icons';
+import { LiveSoundChart } from './LiveSoundChart'; 
 
 const SeverityBadge = ({ severity }: { severity: string }) => {
   const getSeverityDetails = () => {
@@ -26,6 +27,9 @@ export const HomeScreen = () => {
   const recentAlerts = alerts.slice(1, 4);
 
   const [resolvedId, setResolvedId] = useState<string | null>(null);
+  
+  // NEW: State to control chart visibility
+  const [isChartVisible, setIsChartVisible] = useState(false);
 
   const isResolved = latestAlert && latestAlert.id === resolvedId;
 
@@ -76,7 +80,16 @@ export const HomeScreen = () => {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
       
-      <Text style={styles.headerTitle}>Último Alerta</Text>
+      {/* NEW: Header with Chart Button */}
+      <View style={styles.headerContainer}>
+        <Text style={styles.headerTitle}>Último Alerta</Text>
+        <TouchableOpacity 
+          style={styles.chartButton} 
+          onPress={() => setIsChartVisible(true)}
+        >
+          <Ionicons name="stats-chart" size={24} color="#00D1FF" />
+        </TouchableOpacity>
+      </View>
       
       {latestAlert && (
         <Animated.View style={[
@@ -95,7 +108,6 @@ export const HomeScreen = () => {
             <Text style={styles.mainValue}>{latestAlert.db}</Text>
             <Text style={styles.mainUnit}>dB</Text>
           </View>
-          
           
           <SeverityBadge severity={latestAlert.severity} />
           
@@ -129,7 +141,7 @@ export const HomeScreen = () => {
         </Animated.View>
       )}
 
-      <Text style={[styles.headerTitle, { marginTop: 24 }]}>Detecções Recentes</Text>
+      <Text style={[styles.headerTitle, { marginTop: 24, marginBottom: 16 }]}>Detecções Recentes</Text>
       
       <FlatList
         data={recentAlerts}
@@ -137,14 +149,42 @@ export const HomeScreen = () => {
         renderItem={renderRecentItem}
         showsVerticalScrollIndicator={false}
       />
+
+      {/* NEW: Live Chart Modal */}
+      <Modal
+        visible={isChartVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setIsChartVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Monitoramento Ao Vivo</Text>
+              <TouchableOpacity onPress={() => setIsChartVisible(false)}>
+                <Ionicons name="close-circle" size={32} color="#888" />
+              </TouchableOpacity>
+            </View>
+            
+            {/* Render the chart component here */}
+            <LiveSoundChart />
+            
+          </View>
+        </View>
+      </Modal>
+
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000000', paddingHorizontal: 20, paddingTop: 50, paddingBottom: 110 },
-  headerTitle: { fontSize: 28, fontWeight: 'bold', color: '#00D1FF', marginBottom: 16 },
   
+  // NEW: Styles for the header and chart button
+  headerContainer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  headerTitle: { fontSize: 28, fontWeight: 'bold', color: '#00D1FF' },
+  chartButton: { backgroundColor: '#002B36', padding: 10, borderRadius: 12 },
+
   mainCard: {
     borderWidth: 2, 
     borderRadius: 24, 
@@ -159,7 +199,6 @@ const styles = StyleSheet.create({
   hzContainer: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'center' },
   mainValue: { color: '#FFFFFF', fontSize: 64, fontWeight: '900', letterSpacing: -2 },
   mainUnit: { color: '#888888', fontSize: 24, fontWeight: '500', marginLeft: 8 },
-  mainDb: { fontSize: 16, color: '#AAAAAA', marginTop: 4, marginBottom: 16, fontWeight: '600' },
   badge: { paddingHorizontal: 16, paddingVertical: 6, borderRadius: 20, marginBottom: 16 },
   badgeText: { fontSize: 14, fontWeight: 'bold', letterSpacing: 0.5 },
   
@@ -202,5 +241,32 @@ const styles = StyleSheet.create({
   recentInfo: { flex: 1, marginLeft: 12 },
   recentTitle: { fontSize: 16, fontWeight: 'bold', color: '#FFFFFF' },
   recentSubtitle: { fontSize: 13, color: '#888888', marginTop: 4 },
-  recentTime: { fontSize: 14, fontWeight: 'bold', color: '#00D1FF' }
+  recentTime: { fontSize: 14, fontWeight: 'bold', color: '#00D1FF' },
+
+  // NEW: Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#121212',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    minHeight: 400,
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#00D1FF',
+  }
 });

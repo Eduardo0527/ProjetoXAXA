@@ -10,6 +10,8 @@ from starlette.middleware.sessions import SessionMiddleware
 import secrets
 import hashlib
 
+import time  
+from collections import deque
 
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
@@ -17,6 +19,9 @@ from werkzeug.utils import secure_filename
 import mysql.connector
 from mysql.connector import pooling
 
+
+BUFFER_MAXLEN = 100
+live_buffers = {}
 
 app = FastAPI()
 
@@ -84,59 +89,93 @@ async def websocket_endpoint(websocket: WebSocket):
             data = await websocket.receive_text()
     except WebSocketDisconnect:
         manager.disconnect(websocket)
+        
+
+@app.websocket("/ws/sensor")
+async def sensor_input(websocket: WebSocket):
+    await websocket.accept()
+    
+    try:
+        while True:
+            data = await websocket.receive_json()
+            
+            hashed = hashlib.sha256(data["key"].encode()).hexdigest()
+            con = db_pool.get_connection()
+            cursor = con.cursor()
+            try:
+                cursor.execute("SELECT device_id FROM devices WHERE api_key = %s;", (hashed,))
+                row = cursor.fetchone()
+            finally:
+                cursor.close()
+                con.close()
+
+            if not row:
+                await websocket.close(code=1008)  
+                return
+
+            db   = data["db"]
+            room = data["room"]
+            severity = "HIGH" if db > 80.0 else "LOW"
+
+            timestamp = int(time.time() * 1000)
+            if room not in live_buffers:
+                live_buffers[room] = deque(maxlen=BUFFER_MAXLEN)
+            live_buffers[room].append({"db": db, "t": timestamp})
+
+            await manager.broadcast({
+                "type": "READING",
+                "data": {"db": db, "room": room, "t": timestamp, "severity": severity}
+            })
+
+    except WebSocketDisconnect:
+        pass
+    except Exception as e:
+        print(f"Sensor WS error: {e}")
+        await websocket.close()
 
 
-@app.post('/upload-audio') 
+@app.post('/upload-audio')
 async def upload_sensor_data(
-    request: Request, 
-    db: float = Form(...), 
+    request: Request,
+    db: float = Form(...),
     room: str = Form(...),
+    is_alert: bool = Form(False),  
     x_api_key: str = Header(None)
 ):
     if not x_api_key:
-        return JSONResponse({'error': 'Missing API Key in headers'}, status_code=401)
-        
-    con = db_pool.get_connection()
+        return JSONResponse({'error': 'Missing API Key'}, status_code=401)
+
+    severity = "HIGH" if db > 80.0 else "LOW"
+    con    = db_pool.get_connection()
     cursor = con.cursor()
-    
-    device_id = None
-    
     try:
         hashed_key = hashlib.sha256(x_api_key.encode()).hexdigest()
-        
-        query_device = "SELECT device_id FROM devices WHERE api_key = %s;"
-        cursor.execute(query_device, (hashed_key,))
+        cursor.execute("SELECT device_id FROM devices WHERE api_key = %s;", (hashed_key,))
         row = cursor.fetchone()
-        
-        if row:
-            device_id = row[0]
-        else:
+        if not row:
             return JSONResponse({'error': 'Invalid API Key'}, status_code=401)
-            
-        classification = f"Ruído de {db}dB registrado: {room}"
-        severity = "HIGH" if db > 80.0 else "LOW"
-        
-        query_insert = "INSERT INTO sounds (sound_description, device_id) VALUES (%s, %s);"
-        cursor.execute(query_insert, (classification, device_id))
-        con.commit()     
-        
+        if is_alert:
+            classification = f"Ruído de {db:.1f}dB registrado: {room}"
+            cursor.execute(
+                "INSERT INTO sounds (sound_description, device_id) VALUES (%s, %s);",
+                (classification, row[0])
+            )
+            con.commit()
     finally:
         cursor.close()
         con.close()
 
-    alert_payload = {
-        "type": "ALERT",
-        "data": {
-            "db": db,
-            "room": room,
-            "severity": severity,
-            "classification": classification
-        }
-    }
-    
-    await manager.broadcast(alert_payload)
-        
-    return JSONResponse({"message": "Data processed successfully", "alert": alert_payload}, status_code=200)
+    timestamp = int(time.time() * 1000)
+    if room not in live_buffers:
+        live_buffers[room] = deque(maxlen=BUFFER_MAXLEN)
+    live_buffers[room].append({"db": db, "t": timestamp})
+
+    await manager.broadcast({
+        "type":  "ALERT" if is_alert else "READING",
+        "data":  {"db": db, "room": room, "t": timestamp, "severity": severity}
+    })
+
+    return JSONResponse({"message": "OK"}, status_code=200)
 
 
 @app.get("/view-sounds", response_class=HTMLResponse)

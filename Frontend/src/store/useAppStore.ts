@@ -21,11 +21,20 @@ export interface Sensor {
   roomType: 'Noisy' | 'Silent';
 }
 
+// 1. Define the Reading interface for the real-time chart
+export interface Reading {
+  value: number;
+  time: number;
+  room: string;
+}
+
 interface AppState {
   alerts: Alert[];
   sensors: Sensor[];
+  readings: Reading[]; // Array for the live chart
   addAlert: (alert: Alert) => void;
   updateSensorStatus: (id: string, status: 'Active' | 'Offline') => void;
+  addReading: (reading: Reading) => void; // Function to add incoming 500ms data
 }
 
 const MOCK_ALERTS: Alert[] = [
@@ -45,14 +54,37 @@ export const useAppStore = create<AppState>()(
     (set) => ({
       alerts: MOCK_ALERTS,
       sensors: MOCK_SENSORS,
+      readings: [], // Initialize the readings array
+
       addAlert: (alert) => set((state) => ({ alerts: [alert, ...state.alerts] })),
+      
       updateSensorStatus: (id, status) => set((state) => ({
         sensors: state.sensors.map(s => s.id === id ? { ...s, status } : s)
       })),
+
+      // 2. Implement addReading with a buffer limit to maintain performance
+      addReading: (reading) => 
+        set((state) => {
+          const newReadings = [...state.readings, reading];
+          
+          // Keep only the last 30 readings (15 seconds of data at 500ms intervals)
+          if (newReadings.length > 30) {
+            return { readings: newReadings.slice(newReadings.length - 30) };
+          }
+          
+          return { readings: newReadings };
+        }),
     }),
     {
       name: 'sound-monitor-storage',
       storage: createJSONStorage(() => AsyncStorage),
+      
+      // 3. Prevent the 500ms stream from constantly writing to disk
+      partialize: (state) => ({
+        alerts: state.alerts,
+        sensors: state.sensors,
+        // Notice that 'readings' is explicitly excluded here
+      }),
     }
   )
 );

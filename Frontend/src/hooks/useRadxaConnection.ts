@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useAppStore } from '../store/useAppStore';
 
-const FASTAPI_WS_URL = 'wss://plaintiff-don-larger-spokesman.trycloudflare.com/ws/alerts';
+const FASTAPI_WS_URL = 'wss://investor-lamps-marion-periodically.trycloudflare.com/ws/alerts';
 
 export const useRadxaConnection = () => {
   const ws = useRef<WebSocket | null>(null);
@@ -30,6 +30,15 @@ export const useRadxaConnection = () => {
               time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
               severity: payload.data.severity,
               description: payload.data.classification // adicionei a descrição pro texto da API
+            });
+          }
+
+          if (payload.type === 'READING') {
+            // Add this action to your useAppStore
+            useAppStore.getState().addReading({
+              value: payload.data.db,
+              time: payload.data.t, 
+              room: payload.data.room
             });
           }
           
