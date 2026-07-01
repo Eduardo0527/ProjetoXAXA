@@ -146,6 +146,8 @@ async def upload_sensor_data(
         return JSONResponse({'error': 'Missing API Key'}, status_code=401)
 
     severity = "HIGH" if db > 80.0 else "LOW"
+    classification = "Normal" 
+    
     con    = db_pool.get_connection()
     cursor = con.cursor()
     try:
@@ -172,7 +174,13 @@ async def upload_sensor_data(
 
     await manager.broadcast({
         "type":  "ALERT" if is_alert else "READING",
-        "data":  {"db": db, "room": room, "t": timestamp, "severity": severity}
+        "data":  {
+            "db": db, 
+            "room": room, 
+            "t": timestamp, 
+            "severity": severity,
+            "classification": classification 
+        }
     })
 
     return JSONResponse({"message": "OK"}, status_code=200)

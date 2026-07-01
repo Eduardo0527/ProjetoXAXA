@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react';
 import { useAppStore } from '../store/useAppStore';
+import { useLiveStore } from '../store/useLiveStore'; // Import the new store
 
-const FASTAPI_WS_URL = 'wss://investor-lamps-marion-periodically.trycloudflare.com/ws/alerts';
+const FASTAPI_WS_URL = 'ws://192.168.0.169:5000/ws/alerts';
 
 export const useRadxaConnection = () => {
   const ws = useRef<WebSocket | null>(null);
@@ -14,10 +15,6 @@ export const useRadxaConnection = () => {
     const connect = () => {
       ws.current = new WebSocket(FASTAPI_WS_URL);
 
-      ws.current.onopen = () => {
-        console.log('✅ Conectado ao Backend FastAPI');
-      };
-
       ws.current.onmessage = (event) => {
         try {
           const payload = JSON.parse(event.data);
@@ -29,13 +26,13 @@ export const useRadxaConnection = () => {
               room: payload.data.room,
               time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
               severity: payload.data.severity,
-              description: payload.data.classification // adicionei a descrição pro texto da API
+              description: payload.data.classification
             });
           }
 
           if (payload.type === 'READING') {
-            // Add this action to your useAppStore
-            useAppStore.getState().addReading({
+             // Send high-frequency data to the non-persisted store
+             useLiveStore.getState().addReading({
               value: payload.data.db,
               time: payload.data.t, 
               room: payload.data.room

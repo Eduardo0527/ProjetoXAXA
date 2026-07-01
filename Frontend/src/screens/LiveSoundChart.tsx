@@ -1,11 +1,10 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { LineChart } from 'react-native-gifted-charts';
-import { useAppStore } from '../store/useAppStore';
+import { useLiveStore } from '../store/useLiveStore'; // Point to new store
 
 export const LiveSoundChart = () => {
-  // Assuming your store keeps an array of reading objects: { value: number }
-  const readings = useAppStore((state) => state.readings);
+  const readings = useLiveStore((state) => state.readings);
 
   return (
     <View style={styles.container}>
@@ -16,18 +15,16 @@ export const LiveSoundChart = () => {
           data={readings}
           width={300}
           height={200}
-          isAnimated
-          animateOnDataChange
-          animationDuration={300}
+          // Animations removed to fix clunkiness on 500ms intervals
           thickness={3}
           color="#007AFF"
           yAxisLabelSuffix=" dB"
-          maxValue={120} // Standard max for decibels
+          maxValue={120}
           noOfSections={6}
           hideRules
         />
       ) : (
-        <Text>Aguardando dados do sensor...</Text>
+        <Text style={styles.waitingText}>Aguardando dados do sensor...</Text>
       )}
     </View>
   );
@@ -44,5 +41,10 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 15,
+    color: '#00D1FF',
+  },
+  waitingText: {
+    color: '#888888',
+    fontSize: 14,
   }
 });
